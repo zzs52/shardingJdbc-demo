@@ -1,0 +1,99 @@
+server:
+  port: 8085
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  shardingsphere:
+    # 参数配置，显示sql
+    props:
+      sql:
+        show: true
+    # 配置数据源
+    datasource:
+      # 给每个数据源取别名，下面的ds0,ds1任意取名字
+      names: ds0,ds1
+      # 给master-ds0每个数据源配置数据库连接信息
+      ds0:
+        # 配置druid数据源
+        type: com.alibaba.druid.pool.DruidDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: jdbc:mysql://121.40.184.179:3306/zzs_order_db?useUnicode=true&characterEncoding=utf8&tinyInt1isBit=false&useSSL=false&serverTimezone=GMT
+        username: root
+        password: *
+        maxPoolSize: 100
+        minPoolSize: 5
+      # 配置ds1-slave
+      ds1:
+        type: com.alibaba.druid.pool.DruidDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: jdbc:mysql://121.40.100.114:3306/zzs_order_db?useUnicode=true&characterEncoding=utf8&tinyInt1isBit=false&useSSL=false&serverTimezone=GMT
+        username: root
+        password: *
+        maxPoolSize: 100
+        minPoolSize: 5
+    # 配置默认数据源ds0
+    sharding:
+      # 默认数据源，主要用于写，注意一定要配置读写分离 ,注意：如果不配置，那么就会把这两个节点都当做从slave节点，新增，修改和删除会出错。
+      default-data-source-name: ds0
+      # 配置分表的规则
+      tables:
+        # zzs_user 逻辑表名
+        zzs_user:
+          key-generator:
+            # 主键的列明，
+            column: id
+            type: SNOWFLAKE
+          # 数据节点：数据源$->{0..N}.逻辑表名$->{0..N}
+          actual-data-nodes: ds$->{0..1}.zzs_user$->{0..1}
+          # 拆分库策略，也就是什么样子的数据放入放到哪个数据库中。
+          database-strategy:
+#            inline:
+#              sharding-column: sex    # 分片字段（分片键）
+#              algorithm-expression: ds$->{sex % 2} # 分片算法表达式
+            standard:
+              shardingColumn: birthday    # 分片字段（分片键）
+              preciseAlgorithmClassName: com.zzs.shardingJdbc.algorithm.BirthdayAlgorithm # 分片算法表达式
+          # 拆分表策略，也就是什么样子的数据放入放到哪个数据表中。
+          table-strategy:
+            inline:
+              sharding-column: age    # 分片字段（分片键）
+              algorithm-expression: zzs_user$->{age % 2} # 分片算法表达式
+        zzs_order:
+          # 数据节点：数据源$->{0..N}.逻辑表名$->{0..N}
+          actual-data-nodes: ds0.zzs_order$->{0..1}
+          key-generator:
+            column: orderid
+            type: SNOWFLAKE
+          # 拆分表策略，也就是什么样子的数据放入放到哪个数据表中。
+          table-strategy:
+            inline:
+              sharding-column: orderid    # 分片字段（分片键）
+              algorithm-expression: zzs_order$->{orderid % 2} # 分片算法表达式
+        zzs_user_order:
+          # 数据节点：数据源$->{0..N}.逻辑表名$->{0..N}
+          actual-data-nodes: ds0.zzs_user_order_$->{2021..2022}${(1..3).collect{t ->t.toString().padLeft(2,'0')} }
+          key-generator:
+            column: orderid
+            type: SNOWFLAKE
+          # 拆分表策略，也就是什么样子的数据放入放到哪个数据表中。
+          table-strategy:
+            inline:
+              shardingColumn: yearmonth
+              algorithmExpression: zzs_user_order_$->{yearmonth}
+#            standard:
+#              shardingColumn: yearmonth
+#              preciseAlgorithmClassName: com.zzs.shardingJdbc.algorithm.YearMonthShardingAlgorithm
+#    # 配置数据源的读写分离，但是数据库一定要做主从复制
+#    masterslave:
+#      # 配置主从名称，可以任意取名字
+#      name: ms
+#      # 配置主库master，负责数据的写入
+#      master-data-source-name: ds0
+#      # 配置从库slave节点
+#      slave-data-source-names: ds1
+#      # 配置slave节点的负载均衡均衡策略，采用轮询机制
+#      load-balance-algorithm-type: round_robin
+# 整合mybatis的配置XXXXX
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.zzs.shardingJdbc.entity
