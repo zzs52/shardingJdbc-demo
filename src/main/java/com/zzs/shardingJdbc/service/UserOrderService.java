@@ -24,8 +24,8 @@ public class UserOrderService {
     public int saveUserOrder(User user, Order order) {
         userMapper.addUser(user);
         order.setUserid(user.getId());
+        // int a = 1/0; // 测试回滚，统一提交的话，将这行注释掉就行
         orderMapper.addOrder(order);
-        // int a = 1/0; //测试回滚，统一提交的话，将这行注释掉就行
         return 1;
     }
 }
